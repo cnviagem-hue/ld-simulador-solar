@@ -1143,11 +1143,11 @@ const EmpresaView = ({ setView, userData }) => {
                                       sim.status === 'Fin Aprovado' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                                       'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}
                               >
-                                 <option value="Negociando">Negociando</option>
-                                 <option value="Fin Aprovado">Fin Aprovado</option>
-                                 <option value="Fin Reprovado">Fin Reprovado</option>
-                                 <option value="Não Interessou">Não Interessou</option>
-                                 <option value="Fechou">Fechou</option>
+                                 <option value="Negociando" className="bg-[#0B192C] text-white">Negociando</option>
+                                 <option value="Fin Aprovado" className="bg-[#0B192C] text-white">Fin Aprovado</option>
+                                 <option value="Fin Reprovado" className="bg-[#0B192C] text-white">Fin Reprovado</option>
+                                 <option value="Não Interessou" className="bg-[#0B192C] text-white">Não Interessou</option>
+                                 <option value="Fechou" className="bg-[#0B192C] text-white">Fechou</option>
                               </select>
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-amber-500 whitespace-nowrap">{formatarMoeda(sim.valor)}</td>
@@ -1782,7 +1782,7 @@ const VendedorView = ({ setView, kitsString, kitsMicro, userData }) => {
                              <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{sim.whatsapp}</td>
                              <td className="px-4 py-3 text-xs whitespace-nowrap">{sim.cidade}</td>
                              <td className="px-4 py-3 text-xs whitespace-nowrap">{sim.estrutura}</td>
-                             <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${sim.tipoKit === 'String' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>{sim.tipoKit}</span></td>
+                             <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider mr-2 ${sim.tipoKit === 'String' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>{sim.tipoKit}</span></td>
                              <td className="px-4 py-3 text-xs font-semibold whitespace-nowrap">{sim.kit}</td>
                              <td className="px-4 py-3 text-center whitespace-nowrap">
                                  <select 
@@ -1794,11 +1794,11 @@ const VendedorView = ({ setView, kitsString, kitsMicro, userData }) => {
                                          sim.status === 'Fin Aprovado' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                                          'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}
                                  >
-                                    <option value="Negociando">Negociando</option>
-                                    <option value="Fin Aprovado">Fin Aprovado</option>
-                                    <option value="Fin Reprovado">Fin Reprovado</option>
-                                    <option value="Não Interessou">Não Interessou</option>
-                                    <option value="Fechou">Fechou</option>
+                                    <option value="Negociando" className="bg-[#0B192C] text-white">Negociando</option>
+                                    <option value="Fin Aprovado" className="bg-[#0B192C] text-white">Fin Aprovado</option>
+                                    <option value="Fin Reprovado" className="bg-[#0B192C] text-white">Fin Reprovado</option>
+                                    <option value="Não Interessou" className="bg-[#0B192C] text-white">Não Interessou</option>
+                                    <option value="Fechou" className="bg-[#0B192C] text-white">Fechou</option>
                                  </select>
                              </td>
                              <td className="px-4 py-3 text-right font-bold text-amber-500 whitespace-nowrap">{formatarMoeda(sim.valor)}</td>
