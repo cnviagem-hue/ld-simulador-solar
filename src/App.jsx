@@ -683,8 +683,10 @@ const EmpresaView = ({ setView, userData }) => {
       const docs = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.empresaId !== userData.uid) return; // BLOQUEIO ESTRITO: Impede o vazamento de dados entre empresas
         
+        // BLOQUEIO ABSOLUTO NA RAIZ: Se não for a empresa dona, ignora imediatamente.
+        if (data.empresaId !== userData.uid) return; 
+
         let dataFormatada = 'Sem Data';
         let msTimestamp = 0;
         if (data.timestamp) {
@@ -705,6 +707,7 @@ const EmpresaView = ({ setView, userData }) => {
       setOrcamentos(docs);
       setLoadingCRM(false);
     }, (error) => {
+      console.error(error);
       setLoadingCRM(false);
     });
     return () => unsubscribe();
@@ -1131,7 +1134,7 @@ const EmpresaView = ({ setView, userData }) => {
                           <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{sim.whatsapp}</td>
                           <td className="px-4 py-3 text-xs whitespace-nowrap">{sim.cidade}</td>
                           <td className="px-4 py-3 text-xs whitespace-nowrap">{sim.estrutura}</td>
-                          <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${sim.tipoKit === 'String' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>{sim.tipoKit}</span></td>
+                          <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider mr-2 ${sim.tipoKit === 'String' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>{sim.tipoKit}</span></td>
                           <td className="px-4 py-3 text-xs font-semibold whitespace-nowrap">{sim.kit}</td>
                           <td className="px-4 py-3 text-center whitespace-nowrap">
                               <select 
@@ -1706,8 +1709,8 @@ const VendedorView = ({ setView, kitsString, kitsMicro, userData }) => {
                             <div className="bg-gradient-to-br from-[#0B192C] to-slate-900 border border-slate-700/80 rounded-2xl p-5 sm:p-6 mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 relative overflow-hidden shadow-lg">
                                 <div className="absolute -right-8 -bottom-8 text-slate-800/40 pointer-events-none transform rotate-12"><Sun className="w-48 h-48"/></div>
                                 <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Qtd. Placas</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{activeKit ? activeKit.Placas : '--'}</span></div>
+                                <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Potência</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{activeKit ? activeKit.Modulo.replace(/Módulo\s*/gi, '').trim() : '--'}</span></div>
                                 <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Inversor</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{activeKit ? activeKit.Inversor : '--'}</span></div>
-                                <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Estrutura</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{formData.roofStructure || '--'}</span></div>
                                 <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5"><span className="text-emerald-600">Valor do Kit</span></span><span className="text-base sm:text-lg font-extrabold text-emerald-400 block truncate">{activeKit ? formatarMoeda(activeKit.Valor) : '--'}</span></div>
                             </div>
                         </div>
