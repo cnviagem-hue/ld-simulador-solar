@@ -1,3 +1,5 @@
+ATUALIZAR
+
 import React, { useState, useEffect } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, getDocs, writeBatch, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -532,14 +534,7 @@ const MasterView = ({ setView }) => {
                       </div>
                       <div>
                         <label className="text-xs font-bold text-slate-400 mb-1 block">WhatsApp</label>
-                        <input type="tel" value={novaEmpresa.whatsapp} onChange={(e) => {
-                          let val = e.target.value.replace(/\D/g, '');
-                          if (val.length > 11) val = val.substring(0, 11);
-                          let formatted = val.length > 0 ? '(' + val.substring(0, 2) : '';
-                          if (val.length > 2) formatted += ') ' + val.substring(2, 7);
-                          if (val.length > 7) formatted += '-' + val.substring(7, 11);
-                          setNovaEmpresa({...novaEmpresa, whatsapp: formatted});
-                        }} placeholder="(00) 00000-0000" className="w-full bg-[#030811] border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-amber-500"/>
+                        <input type="text" value={novaEmpresa.whatsapp} onChange={(e) => setNovaEmpresa({...novaEmpresa, whatsapp: e.target.value})} placeholder="(00) 00000-0000" className="w-full bg-[#030811] border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-amber-500"/>
                       </div>
                    </div>
                    <div>
@@ -658,7 +653,10 @@ const EmpresaView = ({ setView, userData }) => {
   const [uploadStatus, setUploadStatus] = useState('idle');
   
   const [vendedoresLista, setVendedoresLista] = useState([]);
+  const [vendedorSearchTerm, setVendedorSearchTerm] = useState('');
+  const [vendedorStatusFilter, setVendedorStatusFilter] = useState('all');
   const [loadingVendedores, setLoadingVendedores] = useState(true);
+  
   const [isVendedorModalOpen, setIsVendedorModalOpen] = useState(false);
   const [editVendedorModal, setEditVendedorModal] = useState(null);
   const [vendedorToDelete, setVendedorToDelete] = useState(null);
@@ -683,10 +681,7 @@ const EmpresaView = ({ setView, userData }) => {
       const docs = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        
-        // BLOQUEIO ABSOLUTO NA RAIZ: Se não for a empresa dona, ignora imediatamente.
-        if (data.empresaId !== userData.uid) return; 
-
+        if (data.empresaId !== userData.uid) return; // BLOQUEIO ABSOLUTO: Impede que empresas vejam orçamentos de outras
         let dataFormatada = 'Sem Data';
         let msTimestamp = 0;
         if (data.timestamp) {
@@ -707,7 +702,6 @@ const EmpresaView = ({ setView, userData }) => {
       setOrcamentos(docs);
       setLoadingCRM(false);
     }, (error) => {
-      console.error(error);
       setLoadingCRM(false);
     });
     return () => unsubscribe();
@@ -735,6 +729,7 @@ const EmpresaView = ({ setView, userData }) => {
   }, [userData]);
 
   const orcamentosFiltrados = orcamentos.filter(orc => {
+      if (userData && userData.uid && orc.empresaId && orc.empresaId !== userData.uid) return false;
       if (vendedorFilter !== 'todos' && orc.vendedor !== vendedorFilter) return false;
 
       const currentStatus = orc.status || 'Negociando';
@@ -769,10 +764,12 @@ const EmpresaView = ({ setView, userData }) => {
   const umDiaMsDash = 24 * 60 * 60 * 1000;
 
   const simulacoesHoje = orcamentos.filter(orc => {
+      if (userData && userData.uid && orc.empresaId && orc.empresaId !== userData.uid) return false;
       return orc.msTimestamp && orc.msTimestamp >= hojeMsDash;
   }).length;
 
   const simulacoesSemana = orcamentos.filter(orc => {
+      if (userData && userData.uid && orc.empresaId && orc.empresaId !== userData.uid) return false;
       return orc.msTimestamp && orc.msTimestamp >= (hojeMsDash - 7 * umDiaMsDash);
   }).length;
 
@@ -786,6 +783,7 @@ const EmpresaView = ({ setView, userData }) => {
       const endMs = startMs + 24 * 60 * 60 * 1000;
       
       const qtd = orcamentos.filter(orc => {
+          if (userData && userData.uid && orc.empresaId && orc.empresaId !== userData.uid) return false;
           return orc.msTimestamp >= startMs && orc.msTimestamp < endMs;
       }).length;
 
@@ -876,9 +874,7 @@ const EmpresaView = ({ setView, userData }) => {
           const batch = writeBatch(db);
           
           snapshot.docs.forEach((docSnap) => {
-              if (docSnap.data().empresaId === userData.uid) {
-                  batch.delete(doc(db, "kits", docSnap.id));
-              }
+              batch.delete(doc(db, "kits", docSnap.id));
           });
           
           setUploadStatus('saving');
@@ -920,7 +916,7 @@ const EmpresaView = ({ setView, userData }) => {
 
   const downloadTemplate = (e) => {
     e.preventDefault();
-    const csvContent = "data:text/csv;charset=utf-8,Kit,Placas,Modulo,Inversor,Valor,Tipo\nKIT 500kWh,6,590W,AUXSOL 3K,10000.00,String\nKIT MICRO 300kWh,4,620W,TSUNESS,8500.00,Micro";
+    const csvContent = "data:text/csv;charset=utf-8,Kit;Placas;Modulo;Inversor;Valor;Tipo\n";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -991,6 +987,12 @@ const EmpresaView = ({ setView, userData }) => {
       }
   };
   
+  const vendedoresFiltrados = vendedoresLista.filter(vend => {
+      const matchesSearch = vend.nome?.toLowerCase().includes(vendedorSearchTerm.toLowerCase()) || vend.email?.toLowerCase().includes(vendedorSearchTerm.toLowerCase());
+      const matchesStatus = vendedorStatusFilter === 'all' || vend.status?.toLowerCase() === vendedorStatusFilter.toLowerCase();
+      return matchesSearch && matchesStatus;
+  });
+
   return (
     <DashboardLayout title={`Painel da Empresa (${userData?.nome || 'SolarTech'})`} setView={setView} role="empresa" currentTab={currentTab} setCurrentTab={setCurrentTab}>
       {toast && (
@@ -1166,12 +1168,26 @@ const EmpresaView = ({ setView, userData }) => {
 
       {currentTab === 'vendedores' && (
         <div className="bg-[#0B192C] border border-slate-800 rounded-2xl overflow-hidden shadow-xl relative w-full">
-          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0B192C]/50 w-full">
-            <div>
-              <h3 className="text-xl font-bold text-white flex items-center gap-2"><Users className="w-6 h-6 text-amber-500"/> Gestão de Equipa</h3>
-              <p className="text-sm text-slate-400 mt-1">Controle os acessos e informações dos seus consultores comerciais.</p>
+          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col gap-4 bg-[#0B192C]/50 w-full">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2"><Users className="w-6 h-6 text-amber-500"/> Gestão de Equipa</h3>
+                <p className="text-sm text-slate-400 mt-1">Controle os acessos e informações dos seus consultores comerciais.</p>
+              </div>
+              <button onClick={handleOpenNovoVendedor} className="flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-900 font-extrabold px-5 py-2.5 rounded-xl transition shadow-lg w-full sm:w-auto shrink-0"><Plus className="w-4 h-4" /> <span>Novo Vendedor</span></button>
             </div>
-            <button onClick={handleOpenNovoVendedor} className="flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-900 font-extrabold px-5 py-2.5 rounded-xl transition shadow-lg w-full sm:w-auto shrink-0"><Plus className="w-4 h-4" /> <span>Novo Vendedor</span></button>
+            
+            <div className="w-full flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1 group w-full">
+                <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-500 group-focus-within:text-amber-500" />
+                <input type="text" placeholder="Buscar consultor por nome ou e-mail..." value={vendedorSearchTerm} onChange={(e) => setVendedorSearchTerm(e.target.value)} className="w-full bg-[#030811] border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:border-amber-500 outline-none shadow-inner transition" />
+              </div>
+              <select value={vendedorStatusFilter} onChange={(e) => setVendedorStatusFilter(e.target.value)} className="w-full sm:w-48 bg-[#030811] border border-slate-700 rounded-xl py-2.5 px-4 text-sm text-white focus:border-amber-500 outline-none shadow-inner transition cursor-pointer appearance-none">
+                  <option value="all" className="bg-[#0B192C] text-white">Todos os Status</option>
+                  <option value="Ativo" className="bg-[#0B192C] text-white">Ativos</option>
+                  <option value="Bloqueado" className="bg-[#0B192C] text-white">Bloqueados</option>
+              </select>
+            </div>
           </div>
           
           <div className="overflow-x-auto w-full block min-h-[300px]">
@@ -1190,16 +1206,15 @@ const EmpresaView = ({ setView, userData }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {vendedoresLista.length === 0 ? (
+                  {vendedoresFiltrados.length === 0 ? (
                     <tr>
                       <td colSpan="4" className="text-center py-16">
                         <Users className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-                        <p className="text-slate-500 font-bold">Nenhum vendedor cadastrado na sua equipa.</p>
-                        <p className="text-xs text-slate-600 mt-1">Clique em "Novo Vendedor" para adicionar o seu primeiro consultor.</p>
+                        <p className="text-slate-500 font-bold">Nenhum vendedor encontrado com estes filtros.</p>
                       </td>
                     </tr>
                   ) : (
-                    vendedoresLista.map((vend) => (
+                    vendedoresFiltrados.map((vend) => (
                       <tr key={vend.id} className="hover:bg-slate-800/40 transition">
                         <td className="px-6 py-4"><div className="font-extrabold text-white text-base">{vend.nome}</div><div className="text-xs text-slate-500 mt-0.5">{vend.email}</div></td>
                         <td className="px-6 py-4">
