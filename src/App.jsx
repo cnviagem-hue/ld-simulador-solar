@@ -829,9 +829,29 @@ const EmpresaView = ({ setView, userData }) => {
   const diasSemanaMap = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
   const dynamicChartData = [];
   let maxVendas = 0;
-  for (let i = 6; i >= 0; i--) {
-      const dataAlvo = new Date(hojeIncioDash);
-      dataAlvo.setDate(hojeIncioDash.getDate() - i);
+  
+  // LOGICA DO GRAFICO ATUALIZADA PARA RESPEITAR O FILTRO
+  let dataInicioGrafico = new Date(hojeIncioDash);
+  let numDias = 7;
+
+  if (dateFilter === 'mes') {
+      dataInicioGrafico.setDate(1); // Primeiro dia do mês
+      const ultimoDiaMes = new Date(dataInicioGrafico.getFullYear(), dataInicioGrafico.getMonth() + 1, 0);
+      numDias = ultimoDiaMes.getDate(); // Qtd dias do mes
+  } else if (dateFilter === 'personalizado' && customStartDash && customEndDash) {
+      const start = new Date(customStartDash + 'T00:00:00');
+      const end = new Date(customEndDash + 'T00:00:00');
+      if (start <= end) {
+          numDias = Math.floor((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+          // Limitamos a 30 dias para não quebrar a UI
+          if(numDias > 30) numDias = 30;
+          dataInicioGrafico = end;
+      }
+  }
+
+  for (let i = numDias - 1; i >= 0; i--) {
+      const dataAlvo = new Date(dataInicioGrafico);
+      dataAlvo.setDate(dataInicioGrafico.getDate() - i);
       const startMs = dataAlvo.getTime();
       const endMs = startMs + 24 * 60 * 60 * 1000;
       
@@ -841,8 +861,12 @@ const EmpresaView = ({ setView, userData }) => {
       }).length;
 
       if (qtd > maxVendas) maxVendas = qtd;
-      dynamicChartData.push({ name: diasSemanaMap[dataAlvo.getDay()], propostas: qtd, height: '0%' });
+      
+      // Formata a label. Se for 7 dias usa Dia da semana. Se for mês/personalizado usa DD/MM.
+      const label = numDias <= 7 ? diasSemanaMap[dataAlvo.getDay()] : `${String(dataAlvo.getDate()).padStart(2, '0')}/${String(dataAlvo.getMonth() + 1).padStart(2, '0')}`;
+      dynamicChartData.push({ name: label, propostas: qtd, height: '0%' });
   }
+  
   dynamicChartData.forEach(d => {
       d.height = maxVendas === 0 ? '5%' : `${Math.max((d.propostas / maxVendas) * 100, 5)}%`;
   });
@@ -1062,8 +1086,9 @@ const EmpresaView = ({ setView, userData }) => {
       const searchStr = String(kitSearchTerm || '').toLowerCase();
       const matchesSearch = kitNameStr.includes(searchStr);
       
-      const tipoStr = String(kit.Tipo || '');
-      const matchesType = kitTypeFilter === 'todos' || tipoStr === kitTypeFilter;
+      const tipoStr = String(kit.Tipo || '').toLowerCase();
+      const filterTypeStr = String(kitTypeFilter || '').toLowerCase();
+      const matchesType = kitTypeFilter === 'todos' || tipoStr === filterTypeStr;
       
       return matchesSearch && matchesType;
   });
