@@ -2150,13 +2150,13 @@ export default function App() {
             return valA - valB;
         };
 
-        if(strings.length === 0 && micros.length === 0) {
-            setKitsString([...fallbackKitsString].sort(sortKits));
-            setKitsMicro([...fallbackKitsMicro].sort(sortKits));
-        } else {
-            setKitsString(strings.sort(sortKits));
-            setKitsMicro(micros.sort(sortKits));
-        }
+        // BLOQUEIO ATUALIZADO: Agora as empresas começam zeradas se não tiverem kits.
+        setKitsString(strings.sort(sortKits));
+        setKitsMicro(micros.sort(sortKits));
+      } else {
+        // Se o banco estiver vazio, garante que o estado zera em vez de manter kits antigos
+        setKitsString([]);
+        setKitsMicro([]);
       }
     });
     return () => unsubscribe();
