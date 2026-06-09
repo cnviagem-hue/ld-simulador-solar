@@ -184,6 +184,20 @@ const LoginView = ({ setView, setUserData }) => {
               return;
           }
 
+          // BLOQUEIO EM CASCATA NO LOGIN DO VENDEDOR
+          if (data.role === 'vendedor' && data.empresaId && data.empresaId !== 'padrao') {
+              const empresaDoc = await getDoc(doc(db, 'usuarios', data.empresaId));
+              if (empresaDoc.exists()) {
+                  const empresaData = empresaDoc.data();
+                  if (empresaData.status === 'Bloqueada' || empresaData.status === 'Bloqueado') {
+                      await signOut(auth);
+                      setError('Acesso suspenso. Entre em contato com o suporte da LD SIMULADOR SOLAR.');
+                      setLoading(false);
+                      return;
+                  }
+              }
+          }
+
           setUserData({ ...data, uid: user.uid });
           if (data.role === 'vendedor') {
             setView('vendedor');
