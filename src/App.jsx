@@ -40,7 +40,7 @@ export const formatarMoeda = (valor) => {
 };
 
 // ==========================================
-// 2. KITS DE SEGURANÇA
+// 2. KITS DE SEGURANÇA (Fallback Inicial)
 // ==========================================
 const fallbackKitsString = [
   { Kit: 'KIT 370kWh (Padrão)', Placas: '5', Modulo: '590W', Inversor: 'AUXSOL 3K', Valor: '9335.68' },
@@ -52,11 +52,6 @@ const fallbackKitsMicro = [
   { Kit: 'KIT MICRO 230KWh (Padrão)', Placas: '3', Modulo: '620W', Inversor: 'TSUNESS TSOL-MX2250', Valor: '7725.81' },
   { Kit: 'KIT MICRO 540KWh (Padrão)', Placas: '7', Modulo: '620W', Inversor: 'TSUNESS TSOL-MX3000D', Valor: '12679.71' },
   { Kit: 'KIT MICRO 1000KWh (Padrão)', Placas: '13', Modulo: '620W', Inversor: 'TSUNESS TSOL-MX3000D', Valor: '20136.94' }
-];
-
-const chartData = [
-  { name: 'Seg', propostas: 12, height: '40%' }, { name: 'Ter', propostas: 19, height: '65%' }, { name: 'Qua', propostas: 15, height: '50%' },
-  { name: 'Qui', propostas: 22, height: '80%' }, { name: 'Sex', propostas: 28, height: '100%' }, { name: 'Sáb', propostas: 9, height: '30%' }, { name: 'Dom', propostas: 4, height: '15%' }
 ];
 
 // ==========================================
@@ -207,7 +202,7 @@ const LoginView = ({ setView, setUserData }) => {
         } else {
           // BLOQUEIO DE CONTAS FANTASMAS (Excluídas)
           await signOut(auth);
-          setError('Acesso negado. A sua conta foi desativada ou excluída.');
+          setError('Acesso negado. A sua conta foi desativada ou excluída permanentemente.');
         }
       }
     } catch (err) {
@@ -392,7 +387,7 @@ const MasterView = ({ setView }) => {
       console.error(err);
       let errorMessage = 'Erro ao criar empresa.';
       if (err.code === 'auth/email-already-in-use') {
-          errorMessage = 'Este e-mail já está a ser utilizado por outra conta.';
+          errorMessage = 'Este e-mail já está a ser utilizado por outra conta. Tente outro.';
       } else if (err.code === 'auth/invalid-email') {
           errorMessage = 'Formato de e-mail inválido.';
       }
@@ -1447,7 +1442,13 @@ const EmpresaView = ({ setView, userData }) => {
                           setIsVendedorModalOpen(false);
                         } catch (err) {
                           console.error(err);
-                          showToast('Erro ao criar vendedor: ' + err.message, 'error');
+                          let errorMessage = 'Erro ao criar vendedor.';
+                          if (err.code === 'auth/email-already-in-use') {
+                              errorMessage = 'Este e-mail já está a ser utilizado por outra conta. Tente outro.';
+                          } else if (err.code === 'auth/invalid-email') {
+                              errorMessage = 'Formato de e-mail inválido.';
+                          }
+                          showToast(errorMessage, 'error');
                         } finally {
                           setVendedorLoading(false);
                         }
@@ -2157,9 +2158,14 @@ export default function App() {
             return valA - valB;
         };
 
-        // BLOQUEIO ATUALIZADO: Agora as empresas começam zeradas se não tiverem kits.
-        setKitsString(strings.sort(sortKits));
-        setKitsMicro(micros.sort(sortKits));
+        if(strings.length === 0 && micros.length === 0) {
+            // BLOQUEIO ATUALIZADO: Agora as empresas começam zeradas se não tiverem kits.
+            setKitsString([]);
+            setKitsMicro([]);
+        } else {
+            setKitsString(strings.sort(sortKits));
+            setKitsMicro(micros.sort(sortKits));
+        }
       } else {
         // Se o banco estiver vazio, garante que o estado zera em vez de manter kits antigos
         setKitsString([]);
