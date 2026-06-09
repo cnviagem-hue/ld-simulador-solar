@@ -390,7 +390,13 @@ const MasterView = ({ setView }) => {
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
-      showToast('Erro ao criar a empresa: ' + err.message, 'error');
+      let errorMessage = 'Erro ao criar empresa.';
+      if (err.code === 'auth/email-already-in-use') {
+          errorMessage = 'Este e-mail já está a ser utilizado por outra conta.';
+      } else if (err.code === 'auth/invalid-email') {
+          errorMessage = 'Formato de e-mail inválido.';
+      }
+      showToast(errorMessage, 'error');
     } finally {
       setEmpresaLoading(false);
     }
