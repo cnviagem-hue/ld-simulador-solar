@@ -205,8 +205,9 @@ const LoginView = ({ setView, setUserData }) => {
             setView('empresa');
           }
         } else {
-          setUserData({ role: 'empresa', uid: user.uid, email: user.email });
-          setView('empresa'); 
+          // BLOQUEIO DE CONTAS FANTASMAS (Excluídas)
+          await signOut(auth);
+          setError('Acesso negado. A sua conta foi desativada ou excluída.');
         }
       }
     } catch (err) {
