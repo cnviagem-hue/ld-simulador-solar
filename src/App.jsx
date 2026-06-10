@@ -40,7 +40,7 @@ export const formatarMoeda = (valor) => {
 };
 
 // ==========================================
-// 2. KITS DE SEGURANÇA (Fallback Inicial)
+// 2. KITS DE SEGURANÇA
 // ==========================================
 const fallbackKitsString = [
   { Kit: 'KIT 370kWh (Padrão)', Placas: '5', Modulo: '590W', Inversor: 'AUXSOL 3K', Valor: '9335.68' },
@@ -52,6 +52,11 @@ const fallbackKitsMicro = [
   { Kit: 'KIT MICRO 230KWh (Padrão)', Placas: '3', Modulo: '620W', Inversor: 'TSUNESS TSOL-MX2250', Valor: '7725.81' },
   { Kit: 'KIT MICRO 540KWh (Padrão)', Placas: '7', Modulo: '620W', Inversor: 'TSUNESS TSOL-MX3000D', Valor: '12679.71' },
   { Kit: 'KIT MICRO 1000KWh (Padrão)', Placas: '13', Modulo: '620W', Inversor: 'TSUNESS TSOL-MX3000D', Valor: '20136.94' }
+];
+
+const chartData = [
+  { name: 'Seg', propostas: 12, height: '40%' }, { name: 'Ter', propostas: 19, height: '65%' }, { name: 'Qua', propostas: 15, height: '50%' },
+  { name: 'Qui', propostas: 22, height: '80%' }, { name: 'Sex', propostas: 28, height: '100%' }, { name: 'Sáb', propostas: 9, height: '30%' }, { name: 'Dom', propostas: 4, height: '15%' }
 ];
 
 // ==========================================
@@ -169,28 +174,16 @@ const LoginView = ({ setView, setUserData }) => {
         setView('master');
       } else {
         const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+        
+        // BLOQUEIO ESTrito DE CONTAS EXCLUÍDAS
         if (userDoc.exists()) {
           const data = userDoc.data();
           
           if (data.status === 'Bloqueado' || data.status === 'Bloqueada') {
               await signOut(auth);
-              setError('Acesso negado. Favor entrar em contato com a Empresa para ativar seu acesso.');
+              setError('Acesso negado. Conta suspensa temporariamente.');
               setLoading(false);
               return;
-          }
-
-          // BLOQUEIO EM CASCATA NO LOGIN DO VENDEDOR
-          if (data.role === 'vendedor' && data.empresaId && data.empresaId !== 'padrao') {
-              const empresaDoc = await getDoc(doc(db, 'usuarios', data.empresaId));
-              if (empresaDoc.exists()) {
-                  const empresaData = empresaDoc.data();
-                  if (empresaData.status === 'Bloqueada' || empresaData.status === 'Bloqueado') {
-                      await signOut(auth);
-                      setError('Acesso suspenso. Entre em contato com o suporte da LD SIMULADOR SOLAR.');
-                      setLoading(false);
-                      return;
-                  }
-              }
           }
 
           setUserData({ ...data, uid: user.uid });
@@ -200,9 +193,11 @@ const LoginView = ({ setView, setUserData }) => {
             setView('empresa');
           }
         } else {
-          // BLOQUEIO DE CONTAS FANTASMAS (Excluídas)
-          await signOut(auth);
-          setError('Acesso negado. A sua conta foi desativada ou excluída permanentemente.');
+            // Se não existe na base de dados, não pode logar.
+            await signOut(auth);
+            setError('Acesso negado. A sua conta foi excluída ou não existe na plataforma.');
+            setLoading(false);
+            return;
         }
       }
     } catch (err) {
@@ -345,7 +340,6 @@ const MasterView = ({ setView }) => {
     return () => unsubscribe();
   }, []);
 
-  // PROTEÇÃO CONTRA TELA BRANCA NO FILTRO (BLINDAGEM)
   const empresasFiltradas = empresas.filter(emp => {
       const nomeStr = String(emp.nome || '').toLowerCase();
       const emailStr = String(emp.email || '').toLowerCase();
@@ -387,7 +381,7 @@ const MasterView = ({ setView }) => {
       console.error(err);
       let errorMessage = 'Erro ao criar empresa.';
       if (err.code === 'auth/email-already-in-use') {
-          errorMessage = 'Este e-mail já está a ser utilizado por outra conta. Tente outro.';
+          errorMessage = 'Este e-mail já está a ser utilizado por outra conta.';
       } else if (err.code === 'auth/invalid-email') {
           errorMessage = 'Formato de e-mail inválido.';
       }
@@ -664,13 +658,12 @@ const EmpresaView = ({ setView, userData }) => {
   const [customStartDash, setCustomStartDash] = useState('');
   const [customEndDash, setCustomEndDash] = useState('');
 
-  const [resultadosFilter, setResultadosFilter] = useState('7dias');
+  const [resultadosFilter, setResultadosFilter] = useState('todos');
   const [customStartCRM, setCustomStartCRM] = useState('');
   const [customEndCRM, setCustomEndCRM] = useState('');
   const [vendedorFilter, setVendedorFilter] = useState('todos');
   const [crmStatusFilter, setCrmStatusFilter] = useState('todos');
   
-  // Modais e Estados de Gestão de Equipa
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('idle');
   
@@ -690,7 +683,6 @@ const EmpresaView = ({ setView, userData }) => {
   const [loadingCRM, setLoadingCRM] = useState(true);
   const [toast, setToast] = useState(null);
 
-  // NOVO: Estado para armazenar e filtrar os kits da empresa
   const [meusKits, setMeusKits] = useState([]);
   const [loadingKits, setLoadingKits] = useState(true);
   const [kitSearchTerm, setKitSearchTerm] = useState('');
@@ -702,7 +694,6 @@ const EmpresaView = ({ setView, userData }) => {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Carregar Orçamentos da Nuvem
   useEffect(() => {
     if (!userData || !userData.uid) return;
     const q = query(collection(db, "orcamentos"), orderBy("timestamp", "desc"));
@@ -710,7 +701,7 @@ const EmpresaView = ({ setView, userData }) => {
       const docs = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.empresaId !== userData.uid) return; // BLOQUEIO ABSOLUTO: Impede que empresas vejam orçamentos de outras
+        if (data.empresaId !== userData.uid) return; 
         let dataFormatada = 'Sem Data';
         let msTimestamp = 0;
         if (data.timestamp && typeof data.timestamp.toDate === 'function') {
@@ -736,7 +727,6 @@ const EmpresaView = ({ setView, userData }) => {
     return () => unsubscribe();
   }, [userData]);
 
-  // Carregar Vendedores da Empresa
   useEffect(() => {
     if (!userData || !userData.uid) return;
     const q = query(collection(db, "usuarios"));
@@ -757,7 +747,6 @@ const EmpresaView = ({ setView, userData }) => {
     return () => unsubscribe();
   }, [userData]);
 
-  // Carregar Kits da Empresa
   useEffect(() => {
     if (!userData || !userData.uid) return;
     const q = query(collection(db, "kits"));
@@ -794,17 +783,27 @@ const EmpresaView = ({ setView, userData }) => {
       const umDiaMs = 24 * 60 * 60 * 1000;
       let limiteMs = 0;
 
-      if (resultadosFilter === 'hoje') {
+      if (resultadosFilter === 'todos') {
+          return true; 
+      } else if (resultadosFilter === 'hoje') {
           const inicioHoje = new Date();
           inicioHoje.setHours(0,0,0,0);
           limiteMs = inicioHoje.getTime();
       } else if (resultadosFilter === '7dias') limiteMs = hojeMs - (7 * umDiaMs);
       else if (resultadosFilter === '15dias') limiteMs = hojeMs - (15 * umDiaMs);
       else if (resultadosFilter === '30dias') limiteMs = hojeMs - (30 * umDiaMs);
-      else if (resultadosFilter === 'personalizado' && customStartCRM && customEndCRM) {
-          const startMs = new Date(customStartCRM + 'T00:00:00').getTime();
-          const endMs = new Date(customEndCRM + 'T23:59:59').getTime();
-          if (orc.msTimestamp < startMs || orc.msTimestamp > endMs) return false;
+      else if (resultadosFilter === 'personalizado') {
+          if (customStartCRM) {
+              const [year, month, day] = customStartCRM.split('-');
+              const startMs = new Date(year, month - 1, day, 0, 0, 0).getTime();
+              if (orc.msTimestamp < startMs) return false;
+          }
+          if (customEndCRM) {
+              const [year, month, day] = customEndCRM.split('-');
+              const endMs = new Date(year, month - 1, day, 23, 59, 59).getTime();
+              if (orc.msTimestamp > endMs) return false;
+          }
+          return true;
       }
 
       if (limiteMs > 0 && orc.msTimestamp && orc.msTimestamp < limiteMs) return false;
@@ -832,20 +831,18 @@ const EmpresaView = ({ setView, userData }) => {
   const dynamicChartData = [];
   let maxVendas = 0;
   
-  // LOGICA DO GRAFICO ATUALIZADA PARA RESPEITAR O FILTRO
   let dataInicioGrafico = new Date(hojeIncioDash);
   let numDias = 7;
 
   if (dateFilter === 'mes') {
-      dataInicioGrafico.setDate(1); // Primeiro dia do mês
+      dataInicioGrafico.setDate(1); 
       const ultimoDiaMes = new Date(dataInicioGrafico.getFullYear(), dataInicioGrafico.getMonth() + 1, 0);
-      numDias = ultimoDiaMes.getDate(); // Qtd dias do mes
+      numDias = ultimoDiaMes.getDate(); 
   } else if (dateFilter === 'personalizado' && customStartDash && customEndDash) {
       const start = new Date(customStartDash + 'T00:00:00');
       const end = new Date(customEndDash + 'T00:00:00');
       if (start <= end) {
           numDias = Math.floor((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
-          // Limitamos a 30 dias para não quebrar a UI
           if(numDias > 30) numDias = 30;
           dataInicioGrafico = end;
       }
@@ -864,7 +861,6 @@ const EmpresaView = ({ setView, userData }) => {
 
       if (qtd > maxVendas) maxVendas = qtd;
       
-      // Formata a label. Se for 7 dias usa Dia da semana. Se for mês/personalizado usa DD/MM.
       const label = numDias <= 7 ? diasSemanaMap[dataAlvo.getDay()] : `${String(dataAlvo.getDate()).padStart(2, '0')}/${String(dataAlvo.getMonth() + 1).padStart(2, '0')}`;
       dynamicChartData.push({ name: label, propostas: qtd, height: '0%' });
   }
@@ -1068,7 +1064,6 @@ const EmpresaView = ({ setView, userData }) => {
       }
   };
   
-  // PROTEÇÃO CONTRA TELA BRANCA NO FILTRO (BLINDAGEM)
   const vendedoresFiltrados = vendedoresLista.filter(vend => {
       const nomeStr = String(vend.nome || '').toLowerCase();
       const emailStr = String(vend.email || '').toLowerCase();
@@ -1082,7 +1077,6 @@ const EmpresaView = ({ setView, userData }) => {
       return matchesSearch && matchesStatus;
   });
 
-  // FILTRO E BLINDAGEM DA LISTA DE KITS
   const kitsFiltrados = meusKits.filter(kit => {
       const kitNameStr = String(kit.Kit || '').toLowerCase();
       const searchStr = String(kitSearchTerm || '').toLowerCase();
@@ -1196,6 +1190,7 @@ const EmpresaView = ({ setView, userData }) => {
                 <div className="w-full overflow-x-auto pb-2 sm:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                   <div className="flex items-center gap-2 w-max">
                     <div className="flex items-center bg-[#030811] border border-slate-700 rounded-xl p-1 shadow-inner shrink-0">
+                      <button onClick={() => {setResultadosFilter('todos'); setCustomStartCRM(''); setCustomEndCRM('');}} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${resultadosFilter === 'todos' ? 'bg-amber-500 text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>Todos</button>
                       <button onClick={() => {setResultadosFilter('hoje'); setCustomStartCRM(''); setCustomEndCRM('');}} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${resultadosFilter === 'hoje' ? 'bg-amber-500 text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>Hoje</button>
                       <button onClick={() => {setResultadosFilter('7dias'); setCustomStartCRM(''); setCustomEndCRM('');}} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${resultadosFilter === '7dias' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}>7 Dias</button>
                       <button onClick={() => {setResultadosFilter('15dias'); setCustomStartCRM(''); setCustomEndCRM('');}} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${resultadosFilter === '15dias' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-white'}`}>15 Dias</button>
@@ -1205,7 +1200,7 @@ const EmpresaView = ({ setView, userData }) => {
                               <input type="date" value={customStartCRM} onChange={(e) => setCustomStartCRM(e.target.value)} className="bg-transparent text-xs text-white outline-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
                               <span className="text-slate-500 text-xs">até</span>
                               <input type="date" value={customEndCRM} onChange={(e) => setCustomEndCRM(e.target.value)} className="bg-transparent text-xs text-white outline-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
-                              <button onClick={() => setResultadosFilter('7dias')} className="text-slate-500 hover:text-red-400 ml-1"><X className="w-3 h-3"/></button>
+                              <button onClick={() => setResultadosFilter('todos')} className="text-slate-500 hover:text-red-400 ml-1"><X className="w-3 h-3"/></button>
                           </div>
                       ) : (
                           <button onClick={() => setResultadosFilter('personalizado')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 text-slate-500 hover:text-white whitespace-nowrap`}><Calendar className="w-3 h-3"/> Personalizado</button>
@@ -1367,6 +1362,17 @@ const EmpresaView = ({ setView, userData }) => {
                      <input type="text" value={editVendedorModal.nome} onChange={(e) => setEditVendedorModal({...editVendedorModal, nome: e.target.value})} className="w-full bg-[#030811] border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-amber-500"/>
                    </div>
                    <div>
+                     <label className="text-xs font-bold text-slate-400 mb-1 block">WhatsApp do Consultor</label>
+                     <input type="tel" value={editVendedorModal.whatsapp || ''} onChange={(e) => {
+                          let val = e.target.value.replace(/\D/g, '');
+                          if (val.length > 11) val = val.substring(0, 11);
+                          let formatted = val.length > 0 ? '(' + val.substring(0, 2) : '';
+                          if (val.length > 2) formatted += ') ' + val.substring(2, 7);
+                          if (val.length > 7) formatted += '-' + val.substring(7, 11);
+                          setEditVendedorModal({...editVendedorModal, whatsapp: formatted});
+                      }} placeholder="(00) 00000-0000" className="w-full bg-[#030811] border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-amber-500"/>
+                   </div>
+                   <div>
                      <label className="text-xs font-bold text-slate-400 mb-1 block">E-mail (Login de Acesso)</label>
                      <input type="email" value={editVendedorModal.email} disabled className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-slate-500 text-sm outline-none cursor-not-allowed"/>
                      <p className="text-[10px] text-slate-500 mt-1">O e-mail de acesso não pode ser alterado por motivos de segurança.</p>
@@ -1375,7 +1381,10 @@ const EmpresaView = ({ setView, userData }) => {
                      onClick={async () => {
                         if(!editVendedorModal.nome) return showToast('O nome é obrigatório.', 'error');
                         try {
-                            await updateDoc(doc(db, 'usuarios', editVendedorModal.id), { nome: editVendedorModal.nome });
+                            await updateDoc(doc(db, 'usuarios', editVendedorModal.id), { 
+                                nome: editVendedorModal.nome,
+                                whatsapp: editVendedorModal.whatsapp || ''
+                            });
                             setEditVendedorModal(null);
                             showToast('Vendedor atualizado com sucesso!', 'success');
                         } catch (err) {
@@ -1444,7 +1453,7 @@ const EmpresaView = ({ setView, userData }) => {
                           console.error(err);
                           let errorMessage = 'Erro ao criar vendedor.';
                           if (err.code === 'auth/email-already-in-use') {
-                              errorMessage = 'Este e-mail já está a ser utilizado por outra conta. Tente outro.';
+                              errorMessage = 'Este e-mail já está a ser utilizado. Tente outro.';
                           } else if (err.code === 'auth/invalid-email') {
                               errorMessage = 'Formato de e-mail inválido.';
                           }
@@ -1760,7 +1769,6 @@ const VendedorView = ({ setView, kitsString, kitsMicro, userData }) => {
     setFormData(newFormData);
   };
 
-  // BLINDAGEM NO KITS: Garante que o índice não arrebente a aplicação
   const activeKit = formData.kitString !== '' && kitsString[formData.kitString] 
         ? kitsString[formData.kitString] 
         : formData.kitMicro !== '' && kitsMicro[formData.kitMicro] 
@@ -1794,7 +1802,6 @@ const VendedorView = ({ setView, kitsString, kitsMicro, userData }) => {
         inversor = activeKit.Inversor || '--'; 
         valor = formatarMoeda(activeKit.Valor);
     }
-    // BLINDAGEM DE STRING: Garantir que o valor "módulo" não dá erro na hora do replace
     const cleanPotencia = String(modulo || '').replace(/Módulo\s*/gi, '').trim() || '--';
 
     return `Empresa: *${nomeEmpresa}*\n\nSegue o seu orçamento personalizado de Energia Solar\n\n👤 *Cliente:* ${clientName}\n📍 *Cidade:* ${clientCity}\n📱 *Zap:* ${clientWhatsapp}\n\n🏠 *Estrutura do Telhado:* ${roofStructure}\n📦 *Kit Selecionado:* ${kitName}\n☀️ *Placas:* ${placas}\n⚡ *Potência:* ${cleanPotencia}\n🔄 *Inversor:* ${inversor}\n\n💰 *Valor do Kit:* ${valor}\n\n✨ *Condições Especiais:*\n\n💳 Financiamos 100% com Zero de Entrada\n\n📅 Primeira parcela com prazo de até 120 dias para começar a pagar\n\n💼 Atendido por: *${sellerName}*\n\nFicamos à disposição para esclarecer dúvidas e realizar o seu projeto.`;
@@ -1995,7 +2002,6 @@ const VendedorView = ({ setView, kitsString, kitsMicro, userData }) => {
                             </div>
                             <div className="bg-gradient-to-br from-[#0B192C] to-slate-900 border border-slate-700/80 rounded-2xl p-5 sm:p-6 mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 relative overflow-hidden shadow-lg">
                                 <div className="absolute -right-8 -bottom-8 text-slate-800/40 pointer-events-none transform rotate-12"><Sun className="w-48 h-48"/></div>
-                                {/* BLINDAGEM VISUAL: Garantir que se a propriedade for nula, não quebra a tela com o replace */}
                                 <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Qtd. Placas</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{activeKit ? (activeKit.Placas || '--') : '--'}</span></div>
                                 <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Potência</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{activeKit ? String(activeKit.Modulo || '').replace(/Módulo\s*/gi, '').trim() || '--' : '--'}</span></div>
                                 <div className="space-y-1.5 relative z-10"><span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1.5">Inversor</span><span className="text-base sm:text-lg font-extrabold text-white block truncate">{activeKit ? (activeKit.Inversor || '--') : '--'}</span></div>
@@ -2114,8 +2120,8 @@ export default function App() {
   const [currentView, setCurrentView] = useState('login'); 
   const [userData, setUserData] = useState(null); 
   
-  const [kitsString, setKitsString] = useState(fallbackKitsString);
-  const [kitsMicro, setKitsMicro] = useState(fallbackKitsMicro);
+  const [kitsString, setKitsString] = useState([]);
+  const [kitsMicro, setKitsMicro] = useState([]);
 
   useEffect(() => {
     const blockContextMenu = (e) => e.preventDefault();
@@ -2159,17 +2165,12 @@ export default function App() {
         };
 
         if(strings.length === 0 && micros.length === 0) {
-            // BLOQUEIO ATUALIZADO: Agora as empresas começam zeradas se não tiverem kits.
             setKitsString([]);
             setKitsMicro([]);
         } else {
             setKitsString(strings.sort(sortKits));
             setKitsMicro(micros.sort(sortKits));
         }
-      } else {
-        // Se o banco estiver vazio, garante que o estado zera em vez de manter kits antigos
-        setKitsString([]);
-        setKitsMicro([]);
       }
     });
     return () => unsubscribe();
