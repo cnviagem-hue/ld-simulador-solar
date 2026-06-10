@@ -2151,7 +2151,10 @@ export default function App() {
           const kit = doc.data();
           if (targetEmpresaId && kit.empresaId && kit.empresaId !== targetEmpresaId) return;
 
-          if (kit.Tipo === 'Micro' || (kit.Kit && String(kit.Kit).toUpperCase().includes('MICRO'))) {
+          const tipoStr = String(kit.Tipo || '').toUpperCase();
+          const nomeStr = String(kit.Kit || '').toUpperCase();
+
+          if (tipoStr.includes('MICRO') || nomeStr.includes('MICRO')) {
             micros.push(kit);
           } else {
             strings.push(kit);
